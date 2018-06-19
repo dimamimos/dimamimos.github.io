@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<title>SPARQL-ITMO</title>
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/css/bootstrap-datepicker3.min.css" crossorigin="anonymous">
+	</head>
+	<body>
+		<div id="image-viewer" class="modal fade" tabindex="-1" role="dialog">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-header">
+						<button type="button" class="close" aria-label="Close" data-dismiss="modal">X</button>
+					</div>
+					<div class="modal-body">
+						<img id="large-image" class="img-fluid">
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="container">
+			<div class="row">
+				<div class="col-12">
+					<h3 class="mb-4 mt-4">Space Probes Filtered by Date</h3>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-12">
+					<form class="form-inline" action="#" onsubmit="query(document.getElementById('date').value);return false" >
+						<label for="date" class="mb-4 mr-sm-2">Launch Date:</label>
+						<input class="form-control mb-4 mr-sm-2" id="date">
+						<input type="submit" class="btn btn-primary mb-4 mr-sm-2">
+					</form>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-12">
+					<table class="table table-striped">
+						<thead>
+							<tr>
+								<th scope="col">Probe name</th>
+								<th scope="col">Launch date</th>
+								<th scope="col">Picture</th>
+							</tr>
+						</thead>
+						<tbody id="results"></tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+		<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+		<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.8.0/js/bootstrap-datepicker.min.js" crossorigin="anonymous"></script>
+		<script type="text/javascript">
+			"use strict";
+			function query(date) {
+				let q = `SELECT ?item ?itemLabel ?launchDate (SAMPLE(?image) AS ?image) WHERE {
+	?item wdt:P31 wd:Q26529 .
+	FILTER (?launchDate <= "${date}"^^xsd:dateTime)
+	?item wdt:P619 ?launchDate .
+	SERVICE wikibase:label { bd:serviceParam wikibase:language "en" }
+	OPTIONAL { ?item wdt:P18 ?image }
+} GROUP BY ?item ?itemLabel ?launchDate`;
+				let url = "https://query.wikidata.org/bigdata/namespace/wdq/sparql?query=" + encodeURIComponent(q) + "&format=json";
+				let resultsTable = document.getElementById('results');
+				while (resultsTable.hasChildNodes()) { resultsTable.childNodes[0].remove(); }
+				$.ajax({ dataType: 'json', url: url, success: function(data) {
+					for (const row of data.results.bindings.sort(function(a,b){ return a.launchDate.value > b.launchDate.value })) {
+						let probeName = row.itemLabel.value;
+						let itemName = document.createElement('td');
+						itemName.innerText = probeName;
+						let launchDate = document.createElement('td');
+						launchDate.innerText = row.launchDate.value;
+						let imageUrl = (row.image ? row.image.value : '');
+						let image = document.createElement('td');
+						let imageLink = document.createElement('a');
+						imageLink.href = imageUrl;
+						imageLink.onclick = function() {
+							var tag = document.getElementById('large-image');
+							tag.src = imageUrl;
+							tag.alt = probeName;
+							$('#image-viewer').modal('show');
+							return false;
+						};
+						let imageTag = document.createElement('img');
+						imageTag.src = imageUrl;
+						imageTag.alt = probeName;
+						imageTag.style.height = '50px';
+						imageTag.classList.add('img-thumbnail');
+						imageLink.appendChild(imageTag);
+						image.appendChild(imageLink);
+						let tableRow = document.createElement('tr');
+						tableRow.appendChild(itemName);
+						tableRow.appendChild(launchDate);
+						tableRow.appendChild(image);
+						resultsTable.appendChild(tableRow);
+					}
+				}});
+			}
+			$('#date').datepicker({ format: 'yyyy-mm-dd', autoclose: true });
+		</script>
+	</body>
+</html>
